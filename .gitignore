@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+
+# На будущее
+.venv/
+venv/
+env/
+
+.env
+*.env
+*.log
+logs/
