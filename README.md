@@ -16,7 +16,7 @@
 
 | Путь | Назначение |
 | --- | --- |
-| `/home/priemnik` | Git-копия, редактируемая вручную (в т.ч. `app.py`, `README.md`) |
+| `/home/priemnik` | Git-копия, редактируемая вручную (в т.ч. `app.py`, `README.md`, папка `kopii/`) |
 | `/opt/emotion_ingest` | Боевой код + `.venv`, который реально запускает systemd |
 | `/opt/emotion_ingest/app.py` | Тот же FastAPI, но рабочая версия |
 | `/opt/emotion_ingest/.venv/bin/uvicorn` | Интерпретатор, которым systemd стартует сервер |
@@ -112,6 +112,24 @@ User             = postgres
    - `sudo journalctl -u sensor-ingest.service -f` для логов.
 
 > Совет: можно автоматизировать пункт 3-4 простым скриптом деплоя (rsync + restart), но пока шаги выполняются вручную, чтобы не перепутать рабочую копию и прод.
+
+### Папка `kopii/`
+
+Чтобы в репозитории были копии боевых файлов, в каталоге `kopii/` лежат:
+
+- актуальный `app.py` из `/opt/emotion_ingest`;
+- unit `sensor-ingest.service`;
+- nginx-конфиг `nginx-emotionviz.conf`.
+
+Обновить их можно командами:
+
+```bash
+sudo cp /opt/emotion_ingest/app.py /home/priemnik/kopii/app.py
+sudo cp /etc/systemd/system/sensor-ingest.service /home/priemnik/kopii/sensor-ingest.service
+sudo cp /etc/nginx/sites-available/emotionviz /home/priemnik/kopii/nginx-emotionviz.conf
+```
+
+После чего делаем `git add kopii/* && git commit -m "Refresh deployment copies"`.
 
 ## Полезные команды
 
