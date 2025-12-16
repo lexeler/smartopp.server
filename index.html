@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SmartOPP — Emotion Analytics</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6"></script>
+  <style>
+    :root {
+      --bg-deep: #020408;
+      --bg-card: rgba(10, 14, 24, 0.9);
+      --border: rgba(80, 140, 255, 0.1);
+      --border-glow: rgba(0, 212, 255, 0.5);
+      --text: #f4f8ff;
+      --text-dim: #5a6a8a;
+      --valence: #00e5ff;
+      --valence-glow: rgba(0, 229, 255, 0.6);
+      --arousal: #ff2d7a;
+      --arousal-glow: rgba(255, 45, 122, 0.6);
+      --accent: #7b5cff;
+      --success: #00ffa3;
+      --warning: #ffcc00;
+      --delta-up: #00ffa3;
+      --delta-down: #ff4d6a;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    
+    body {
+      font-family: 'Space Grotesk', -apple-system, sans-serif;
+      background: var(--bg-deep);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Background effects */
+    .bg-effects {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      overflow: hidden;
+    }
+
+    .bg-gradient {
+      position: absolute;
+      inset: 0;
+      background: 
+        radial-gradient(ellipse 100% 80% at 10% 20%, rgba(0, 229, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse 80% 60% at 90% 10%, rgba(255, 45, 122, 0.07) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 80% at 50% 90%, rgba(123, 92, 255, 0.05) 0%, transparent 50%),
+        var(--bg-deep);
+    }
+
+    /* Floating orbs */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.6;
+      animation: float 25s ease-in-out infinite;
+    }
+
+    .orb-1 {
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(0, 229, 255, 0.2) 0%, transparent 70%);
+      top: -10%;
+      left: -5%;
+      animation-delay: 0s;
+    }
+
+    .orb-2 {
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(255, 45, 122, 0.15) 0%, transparent 70%);
+      top: 50%;
+      right: -10%;
+      animation-delay: -8s;
+    }
+
+    .orb-3 {
+      width: 350px;
+      height: 350px;
+      background: radial-gradient(circle, rgba(123, 92, 255, 0.12) 0%, transparent 70%);
+      bottom: -5%;
+      left: 30%;
+      animation-delay: -16s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(40px, -40px) scale(1.05); }
+      50% { transform: translate(-30px, 30px) scale(0.95); }
+      75% { transform: translate(30px, 40px) scale(1.02); }
+    }
+
+    .container { max-width: 1500px; margin: 0 auto; padding: 20px 24px; position: relative; }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 18px 28px;
+      background: var(--bg-card);
+      backdrop-filter: blur(30px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      animation: slideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo { display: flex; align-items: center; gap: 16px; }
+
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--valence), var(--arousal));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 30px var(--valence-glow);
+      animation: logoPulse 3s ease-in-out infinite;
+    }
+
+    @keyframes logoPulse {
+      0%, 100% { box-shadow: 0 0 20px var(--valence-glow); }
+      50% { box-shadow: 0 0 40px var(--arousal-glow); }
+    }
+
+    .logo-text { font-size: 28px; font-weight: 700; }
+    .logo-sub { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 3px; margin-top: 2px; }
+
+    .header-right { display: flex; align-items: center; gap: 16px; }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      background: rgba(0, 255, 163, 0.1);
+      border: 1px solid rgba(0, 255, 163, 0.25);
+      border-radius: 30px;
+      font-size: 13px;
+      color: var(--success);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      box-shadow: 0 0 15px var(--success);
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .btn {
+      font-family: 'Space Grotesk', sans-serif;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(255, 45, 122, 0.1));
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      color: var(--text);
+      padding: 12px 22px;
+      border-radius: 12px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn:hover { 
+      transform: translateY(-2px); 
+      box-shadow: 0 10px 30px rgba(0, 229, 255, 0.2);
+      border-color: var(--valence);
+    }
+
+    /* Navigation */
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 20px;
+      padding: 6px;
+      background: var(--bg-card);
+      backdrop-filter: blur(30px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      animation: fadeUp 0.6s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .nav-tab {
+      flex: 1;
+      padding: 14px 20px;
+      background: transparent;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      position: relative;
+    }
+
+    .nav-tab::after {
+      content: '';
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--valence), var(--arousal));
+      transform: translateX(-50%);
+      transition: width 0.3s;
+    }
+
+    .nav-tab:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+    .nav-tab:hover::after { width: 30px; }
+    
+    .nav-tab.active { 
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(255, 45, 122, 0.08)); 
+      color: var(--text);
+    }
+    .nav-tab.active::after { width: 40px; }
+
+    .tab-content { display: none; animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    .tab-content.active { display: block; }
+
+    /* Section header with sorting */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .section-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sort-select {
+      font-family: 'Space Grotesk', sans-serif;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .sort-select:hover { border-color: var(--valence); }
+    .sort-select:focus { outline: none; border-color: var(--valence); }
+
+    /* Person Grid */
+    .person-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .person-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 2px solid var(--border);
+      border-radius: 20px;
+      padding: 22px 26px;
+      cursor: pointer;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: cardAppear 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes cardAppear {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .person-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.08), rgba(255, 45, 122, 0.05));
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .person-card:hover {
+      transform: translateY(-6px) scale(1.02);
+      border-color: rgba(0, 229, 255, 0.4);
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4), 0 0 40px rgba(0, 229, 255, 0.15);
+    }
+
+    .person-card:hover::before { opacity: 1; }
+
+    .person-card.active {
+      border-color: var(--valence);
+      background: rgba(0, 229, 255, 0.06);
+      box-shadow: 0 0 50px rgba(0, 229, 255, 0.25), inset 0 0 30px rgba(0, 229, 255, 0.03);
+    }
+
+    .person-card.active::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--valence), var(--arousal));
+    }
+
+    .person-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 18px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .person-id {
+      font-size: 28px;
+      font-weight: 700;
+      font-family: 'IBM Plex Mono', monospace;
+      background: linear-gradient(135deg, var(--text), var(--valence));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .person-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(0, 255, 163, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(0, 255, 163, 0.3);
+    }
+
+    .person-device {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .person-emotions {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .emotion-box {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+      transition: all 0.3s;
+    }
+
+    .emotion-box:hover {
+      background: rgba(255, 255, 255, 0.06);
+      transform: translateY(-2px);
+    }
+
+    .emotion-label {
+      font-size: 9px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .emotion-value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .emotion-value.valence { color: var(--valence); }
+    .emotion-value.arousal { color: var(--arousal); }
+    .emotion-value.delta-up { color: var(--delta-up); }
+    .emotion-value.delta-down { color: var(--delta-down); }
+    .emotion-value.delta-neutral { color: var(--text-dim); }
+
+    /* Stats */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    @media (max-width: 1200px) { .stats-row { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 600px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+
+    .stat-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .stat-card:hover { 
+      transform: translateY(-3px); 
+      border-color: rgba(0, 229, 255, 0.2);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .stat-icon { font-size: 18px; margin-bottom: 8px; }
+    .stat-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600; }
+    .stat-value.valence { color: var(--valence); }
+    .stat-value.arousal { color: var(--arousal); }
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.success { color: var(--success); }
+    .stat-value.delta-up { color: var(--delta-up); }
+    .stat-value.delta-down { color: var(--delta-down); }
+    .stat-value.delta-neutral { color: var(--text-dim); }
+    .stat-sub { font-size: 9px; color: var(--text-dim); margin-top: 2px; }
+
+    /* Chart */
+    .chart-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 20px;
+      transition: all 0.3s;
+    }
+
+    .chart-card:hover {
+      border-color: rgba(0, 229, 255, 0.15);
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .chart-title {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .chart-title-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--valence), var(--arousal));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
+    }
+
+    .chart-legend { display: flex; gap: 20px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+    .legend-dot.valence { background: var(--valence); box-shadow: 0 0 10px var(--valence-glow); }
+    .legend-dot.arousal { background: var(--arousal); box-shadow: 0 0 10px var(--arousal-glow); }
+    .legend-dot.visitors { background: var(--success); box-shadow: 0 0 10px rgba(0, 255, 163, 0.5); }
+
+    .chart-container { height: 350px; position: relative; }
+
+    .custom-tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: rgba(5, 8, 15, 0.95);
+      backdrop-filter: blur(15px);
+      border: 1px solid var(--border-glow);
+      border-radius: 14px;
+      padding: 16px 20px;
+      font-size: 12px;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(10px) scale(0.95);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      min-width: 200px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .custom-tooltip.visible { opacity: 1; transform: translateY(0) scale(1); }
+    .tooltip-time { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-dim); margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .tooltip-row { display: flex; justify-content: space-between; margin: 6px 0; }
+    .tooltip-label { color: var(--text-dim); }
+    .tooltip-value { font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+    .tooltip-value.valence { color: var(--valence); }
+    .tooltip-value.arousal { color: var(--arousal); }
+    .tooltip-value.bbox { color: var(--accent); }
+
+    /* Metrics controls */
+    .metrics-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .period-buttons {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .period-btn {
+      font-family: 'Space Grotesk', sans-serif;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .period-btn:hover {
+      border-color: var(--valence);
+      color: var(--text);
+    }
+
+    .period-btn.active {
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(255, 45, 122, 0.1));
+      border-color: var(--valence);
+      color: var(--text);
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+    }
+
+    .date-inputs {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .date-input {
+      font-family: 'IBM Plex Mono', monospace;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .date-input:hover, .date-input:focus {
+      border-color: var(--valence);
+      outline: none;
+    }
+
+    .date-input::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+      cursor: pointer;
+    }
+
+    .metric-chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .metric-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 25px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+    }
+
+    .metric-chip:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .metric-chip.active {
+      border-color: var(--valence);
+      background: rgba(0, 229, 255, 0.1);
+    }
+
+    .metric-chip.active.visitors { border-color: var(--success); background: rgba(0, 255, 163, 0.1); }
+    .metric-chip.active.delta-v { border-color: var(--valence); background: rgba(0, 229, 255, 0.1); }
+    .metric-chip.active.delta-a { border-color: var(--arousal); background: rgba(255, 45, 122, 0.1); }
+
+    .chip-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      opacity: 0.5;
+      transition: opacity 0.3s;
+    }
+
+    .metric-chip.active .chip-dot { opacity: 1; box-shadow: 0 0 10px currentColor; }
+
+    .chip-dot.visitors { background: var(--success); color: var(--success); }
+    .chip-dot.delta-v { background: var(--valence); color: var(--valence); }
+    .chip-dot.delta-a { background: var(--arousal); color: var(--arousal); }
+
+    .chip-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      transition: color 0.3s;
+    }
+
+    .metric-chip.active .chip-label { color: var(--text); }
+
+    /* Stats cards for metrics */
+    .metrics-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .metric-stat-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      transition: all 0.3s;
+    }
+
+    .metric-stat-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(0, 229, 255, 0.2);
+    }
+
+    .metric-stat-icon {
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+
+    .metric-stat-value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .metric-stat-value.visitors { color: var(--success); }
+    .metric-stat-value.delta-v { color: var(--valence); }
+    .metric-stat-value.delta-a { color: var(--arousal); }
+
+    .metric-stat-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Charts grid */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+
+    /* Delta bars */
+    .delta-bars { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+    .delta-bar-item { display: flex; align-items: center; gap: 12px; }
+    .delta-bar-label { width: 60px; font-size: 13px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
+    .delta-bar-track { flex: 1; height: 28px; background: rgba(255,255,255,0.03); border-radius: 6px; position: relative; }
+    .delta-bar-center { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,0.1); }
+    .delta-bar-fill { position: absolute; top: 4px; bottom: 4px; border-radius: 4px; transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+    .delta-bar-fill.positive { left: 50%; background: linear-gradient(90deg, var(--delta-up), rgba(0,255,163,0.3)); }
+    .delta-bar-fill.negative { right: 50%; background: linear-gradient(270deg, var(--delta-down), rgba(255,77,106,0.3)); }
+    .delta-bar-value { width: 80px; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; }
+    .delta-bar-value.positive { color: var(--delta-up); }
+    .delta-bar-value.negative { color: var(--delta-down); }
+    .delta-bar-value.neutral { color: var(--text-dim); }
+
+    /* Loading */
+    .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; color: var(--text-dim); gap: 16px; }
+    .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--valence); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state { text-align: center; padding: 60px; color: var(--text-dim); }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+    @media (max-width: 768px) {
+      .container { padding: 14px; }
+      .header { flex-direction: column; gap: 14px; }
+      .person-grid { grid-template-columns: 1fr; }
+      .person-emotions { grid-template-columns: repeat(2, 1fr); }
+      .nav-tab { font-size: 11px; padding: 12px 10px; }
+      .metrics-controls { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-effects">
+    <div class="bg-gradient"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">🎭</div>
+        <div>
+          <div class="logo-text">SmartOPP</div>
+          <div class="logo-sub">Real-time Analytics</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="status">
+          <span class="status-dot"></span>
+          <span id="statusText">Загрузка...</span>
+        </div>
+        <button class="btn" onclick="location.reload()">⟳ Обновить</button>
+      </div>
+    </header>
+
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="dashboard">📊 Дашборд</button>
+      <button class="nav-tab" data-tab="metrics">📈 Метрики</button>
+      <button class="nav-tab" data-tab="analysis">🔬 Анализ</button>
+      <button class="nav-tab" data-tab="overview">👥 Сравнение</button>
+    </nav>
+
+    <!-- Dashboard -->
+    <div class="tab-content active" id="tab-dashboard">
+      <div class="stats-row" id="statsRow" style="display: none;">
+        <div class="stat-card"><div class="stat-icon">👤</div><div class="stat-label">Человек</div><div class="stat-value accent" id="personId">—</div></div>
+        <div class="stat-card"><div class="stat-icon">😊</div><div class="stat-label">Avg Valence</div><div class="stat-value valence" id="avgV">—</div></div>
+        <div class="stat-card"><div class="stat-icon">⚡</div><div class="stat-label">Avg Arousal</div><div class="stat-value arousal" id="avgA">—</div></div>
+        <div class="stat-card"><div class="stat-icon">📍</div><div class="stat-label">Точек</div><div class="stat-value success" id="points">—</div></div>
+        <div class="stat-card"><div class="stat-icon">📈</div><div class="stat-label">ΔValence</div><div class="stat-value delta-neutral" id="deltaV">—</div><div class="stat-sub">5-25% → 75-95%</div></div>
+        <div class="stat-card"><div class="stat-icon">📈</div><div class="stat-label">ΔArousal</div><div class="stat-value delta-neutral" id="deltaA">—</div><div class="stat-sub">5-25% → 75-95%</div></div>
+      </div>
+
+      <div class="chart-card" id="chartCard" style="display: none;">
+        <div class="chart-header">
+          <div class="chart-title"><div class="chart-title-icon">📈</div>Динамика эмоций</div>
+          <div class="chart-legend">
+            <div class="legend-item"><div class="legend-dot valence"></div>Valence</div>
+            <div class="legend-item"><div class="legend-dot arousal"></div>Arousal</div>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="mainChart"></canvas>
+          <div class="custom-tooltip" id="tooltip">
+            <div class="tooltip-time" id="tooltipTime">--:--:--</div>
+            <div class="tooltip-row"><span class="tooltip-label">Valence</span><span class="tooltip-value valence" id="tooltipV">0.00</span></div>
+            <div class="tooltip-row"><span class="tooltip-label">Arousal</span><span class="tooltip-value arousal" id="tooltipA">0.00</span></div>
+            <div class="tooltip-row"><span class="tooltip-label">BBox Height</span><span class="tooltip-value bbox" id="tooltipBbox">0 px</span></div>
+            <div class="tooltip-row"><span class="tooltip-label">Track ID</span><span class="tooltip-value" id="tooltipTrack" style="color: var(--text-dim)">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Выберите человека</div>
+        <div class="section-controls">
+          <select class="sort-select" id="sortSelect">
+            <option value="id-desc">По ID ↓</option>
+            <option value="id-asc">По ID ↑</option>
+            <option value="points-desc">По точкам ↓</option>
+            <option value="points-asc">По точкам ↑</option>
+            <option value="delta-v-desc">По ΔV ↓</option>
+            <option value="delta-v-asc">По ΔV ↑</option>
+          </select>
+          <div id="personCount" style="font-size: 12px; color: var(--text-dim);">0 записей</div>
+        </div>
+      </div>
+
+      <div class="person-grid" id="personGrid">
+        <div class="loading"><div class="loading-spinner"></div>Загрузка...</div>
+      </div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="tab-content" id="tab-metrics">
+      <div class="metrics-controls">
+        <div class="control-group">
+          <div class="control-label">Период</div>
+          <div class="period-buttons">
+            <button class="period-btn active" data-period="today">Сегодня</button>
+            <button class="period-btn" data-period="7d">7 дней</button>
+            <button class="period-btn" data-period="30d">30 дней</button>
+            <button class="period-btn" data-period="custom">Другой</button>
+          </div>
+        </div>
+        <div class="control-group" id="customDates" style="display: none;">
+          <div class="control-label">Даты</div>
+          <div class="date-inputs">
+            <input type="date" class="date-input" id="dateFrom">
+            <span style="color: var(--text-dim);">→</span>
+            <input type="date" class="date-input" id="dateTo">
+            <button class="btn" style="padding: 10px 16px;" onclick="loadMetrics()">Применить</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="control-label">Группировка</div>
+          <div class="period-buttons">
+            <button class="period-btn resolution-btn" data-resolution="hour">По часам</button>
+            <button class="period-btn resolution-btn active" data-resolution="day">По дням</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="control-label">Метрики</div>
+          <div class="metric-chips">
+            <div class="metric-chip active visitors" data-metric="visitors">
+              <div class="chip-dot visitors"></div>
+              <span class="chip-label">Visitors</span>
+            </div>
+            <div class="metric-chip active delta-v" data-metric="delta-v">
+              <div class="chip-dot delta-v"></div>
+              <span class="chip-label">Avg ΔValence</span>
+            </div>
+            <div class="metric-chip active delta-a" data-metric="delta-a">
+              <div class="chip-dot delta-a"></div>
+              <span class="chip-label">Avg ΔArousal</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="metrics-stats">
+        <div class="metric-stat-card">
+          <div class="metric-stat-icon">👥</div>
+          <div class="metric-stat-value visitors" id="metricVisitors">—</div>
+          <div class="metric-stat-label">Всего посетителей</div>
+        </div>
+        <div class="metric-stat-card">
+          <div class="metric-stat-icon">😊</div>
+          <div class="metric-stat-value delta-v" id="metricDeltaV">—</div>
+          <div class="metric-stat-label">Avg ΔValence</div>
+        </div>
+        <div class="metric-stat-card">
+          <div class="metric-stat-icon">⚡</div>
+          <div class="metric-stat-value delta-a" id="metricDeltaA">—</div>
+          <div class="metric-stat-label">Avg ΔArousal</div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title"><div class="chart-title-icon">📈</div>Метрики по времени</div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+            <div class="chart-legend" id="metricsLegend">
+              <div class="legend-item"><div class="legend-dot visitors"></div>Visitors</div>
+              <div class="legend-item"><div class="legend-dot valence"></div>Avg ΔV</div>
+              <div class="legend-item"><div class="legend-dot arousal"></div>Avg ΔA</div>
+            </div>
+            <div id="metricsInfo" style="font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;"></div>
+          </div>
+        </div>
+        <div class="chart-container" style="height: 400px;">
+          <canvas id="metricsChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analysis -->
+    <div class="tab-content" id="tab-analysis">
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-header"><div class="chart-title"><div class="chart-title-icon">🎯</div>Valence vs Arousal</div></div>
+          <div class="chart-container"><canvas id="scatterChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header"><div class="chart-title"><div class="chart-title-icon">📊</div>Распределение Valence</div></div>
+          <div class="chart-container"><canvas id="histValence"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header"><div class="chart-title"><div class="chart-title-icon">📊</div>Распределение Arousal</div></div>
+          <div class="chart-container"><canvas id="histArousal"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header"><div class="chart-title"><div class="chart-title-icon">📏</div>Размер лица (BBox)</div></div>
+          <div class="chart-container"><canvas id="bboxChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="tab-content" id="tab-overview">
+      <div class="chart-card">
+        <div class="chart-header"><div class="chart-title"><div class="chart-title-icon">😊</div>Изменение настроения (ΔV)</div></div>
+        <div class="delta-bars" id="deltaBarsV"></div>
+      </div>
+      <div class="chart-card" style="margin-top: 20px;">
+        <div class="chart-header"><div class="chart-title"><div class="chart-title-icon">⚡</div>Изменение возбуждения (ΔA)</div></div>
+        <div class="delta-bars" id="deltaBarsA"></div>
+      </div>
+      <div class="chart-card" style="margin-top: 20px;">
+        <div class="chart-header"><div class="chart-title"><div class="chart-title-icon">👥</div>Сравнение всех</div></div>
+        <div class="chart-container" style="height: 400px;"><canvas id="compareChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const API = '/api';
+const LIMIT = 5000;
+
+let mainChart, scatterChart, histValenceChart, histArousalChart, bboxChart, compareChart, metricsChart;
+let currentPersonId = null;
+let currentRecords = [];
+let personsData = [];
+let allRecordsCache = {};
+
+// Metrics state
+let selectedPeriod = 'today';
+let selectedMetrics = { visitors: true, 'delta-v': true, 'delta-a': true };
+// null = авто (по суткам / по часам в зависимости от диапазона)
+let metricsResolution = null;
+
+async function fetchJSON(url) {
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+function fmtTime(ms) {
+  return new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function fmtDate(date) {
+  return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+}
+
+function calculateDelta(values) {
+  if (values.length < 20) return { delta: 0 };
+  const n = values.length;
+  const startSlice = values.slice(Math.floor(n * 0.05), Math.floor(n * 0.25));
+  const endSlice = values.slice(Math.floor(n * 0.75), Math.floor(n * 0.95));
+  return { delta: (endSlice.reduce((a,b)=>a+b,0)/endSlice.length) - (startSlice.reduce((a,b)=>a+b,0)/startSlice.length) };
+}
+
+function getDeltaClass(d) { return d > 0.02 ? 'delta-up' : (d < -0.02 ? 'delta-down' : 'delta-neutral'); }
+function formatDelta(d) { return (d >= 0 ? '+' : '') + d.toFixed(3); }
+
+// Sort function
+function sortPersons(persons, sortKey) {
+  const sorted = [...persons];
+  switch(sortKey) {
+    case 'id-desc': return sorted.sort((a,b) => b.person_id - a.person_id);
+    case 'id-asc': return sorted.sort((a,b) => a.person_id - b.person_id);
+    case 'points-desc': return sorted.sort((a,b) => b.n_points - a.n_points);
+    case 'points-asc': return sorted.sort((a,b) => a.n_points - b.n_points);
+    case 'delta-v-desc': return sorted.sort((a,b) => (b.deltaV?.delta || 0) - (a.deltaV?.delta || 0));
+    case 'delta-v-asc': return sorted.sort((a,b) => (a.deltaV?.delta || 0) - (b.deltaV?.delta || 0));
+    default: return sorted;
+  }
+}
+
+// Tab navigation
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    
+    if (tab.dataset.tab === 'analysis' && currentRecords.length) updateAnalysisCharts();
+    if (tab.dataset.tab === 'overview' && personsData.length) updateOverviewCharts();
+    if (tab.dataset.tab === 'metrics') loadMetrics();
+  });
+});
+
+// Sorting
+document.getElementById('sortSelect').addEventListener('change', (e) => {
+  renderPersonGrid(sortPersons(personsData, e.target.value));
+});
+
+// Period buttons
+document.querySelectorAll('.period-btn[data-period]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.period-btn[data-period]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedPeriod = btn.dataset.period;
+    
+    document.getElementById('customDates').style.display = selectedPeriod === 'custom' ? 'flex' : 'none';
+    
+    // сбрасываем авто-масштаб, но сохраняем ручной выбор
+    loadMetrics();
+  });
+});
+
+// Resolution buttons (часы / дни)
+document.querySelectorAll('.resolution-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.resolution-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    metricsResolution = btn.dataset.resolution; // 'hour' или 'day'
+    loadMetrics();
+  });
+});
+
+// Metric chips
+document.querySelectorAll('.metric-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    chip.classList.toggle('active');
+    selectedMetrics[chip.dataset.metric] = chip.classList.contains('active');
+    updateMetricsChart();
+  });
+});
+
+// Initialize date inputs
+const today = new Date();
+document.getElementById('dateTo').value = today.toISOString().split('T')[0];
+document.getElementById('dateFrom').value = new Date(today - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+function createMainChart() {
+  if (mainChart) return mainChart;
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  const tooltip = document.getElementById('tooltip');
+  
+  mainChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: 'Valence', data: [], borderColor: '#00e5ff', backgroundColor: 'rgba(0,229,255,0.15)', borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 8, tension: 0.4, fill: true },
+      { label: 'Arousal', data: [], borderColor: '#ff2d7a', backgroundColor: 'rgba(255,45,122,0.1)', borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 8, tension: 0.4, fill: true }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6a8a', maxTicksLimit: 8, font: { family: 'IBM Plex Mono' } } },
+        y: { min: -1, max: 1, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6a8a', font: { family: 'IBM Plex Mono' } } }
+      },
+      onHover: (e, el) => {
+        if (el.length && currentRecords[el[0].index]) {
+          const r = currentRecords[el[0].index];
+          document.getElementById('tooltipTime').textContent = fmtTime(r.t_ms);
+          document.getElementById('tooltipV').textContent = r.valence.toFixed(3);
+          document.getElementById('tooltipA').textContent = r.arousal.toFixed(3);
+          document.getElementById('tooltipBbox').textContent = (r.bbox ? r.bbox[3]-r.bbox[1] : 0) + ' px';
+          document.getElementById('tooltipTrack').textContent = r.track_id || '—';
+          tooltip.style.left = Math.min(e.x + 15, mainChart.chartArea.right - 210) + 'px';
+          tooltip.style.top = Math.max(e.y - 70, mainChart.chartArea.top) + 'px';
+          tooltip.classList.add('visible');
+        } else tooltip.classList.remove('visible');
+      }
+    }
+  });
+  document.querySelector('#chartCard .chart-container').addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+  return mainChart;
+}
+
+function updateAnalysisCharts() {
+  const v = currentRecords.map(r => r.valence), a = currentRecords.map(r => r.arousal);
+  const bh = currentRecords.map(r => r.bbox ? r.bbox[3]-r.bbox[1] : 0);
+  
+  // Scatter
+  if (!scatterChart) {
+    scatterChart = new Chart(document.getElementById('scatterChart'), {
+      type: 'scatter',
+      data: { datasets: [{ data: [], backgroundColor: 'rgba(0,229,255,0.5)', pointRadius: 3, pointHoverRadius: 6 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { min: -1, max: 1, title: { display: true, text: 'Valence', color: '#5a6a8a' }, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6a8a' } },
+          y: { min: -1, max: 1, title: { display: true, text: 'Arousal', color: '#5a6a8a' }, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6a8a' } }
+        }
+      }
+    });
+  }
+  scatterChart.data.datasets[0].data = currentRecords.map(r => ({ x: r.valence, y: r.arousal }));
+  scatterChart.update('none');
+
+  const bins = 20, vH = Array(bins).fill(0), aH = Array(bins).fill(0);
+  v.forEach(x => vH[Math.min(bins-1, Math.max(0, Math.floor((x+1)/2*bins)))]++);
+  a.forEach(x => aH[Math.min(bins-1, Math.max(0, Math.floor((x+1)/2*bins)))]++);
+  const labels = Array.from({length:bins}, (_,i) => (-1+i*2/bins).toFixed(1));
+
+  if (!histValenceChart) {
+    histValenceChart = new Chart(document.getElementById('histValence'), {
+      type: 'bar',
+      data: { labels: [], datasets: [{ data: [], backgroundColor: 'rgba(0,229,255,0.6)', borderRadius: 4, hoverBackgroundColor: 'rgba(0,229,255,0.8)' }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: { x: { grid: { display: false }, ticks: { color: '#5a6a8a' } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6a8a' } } }
+      }
+    });
+  }
+  histValenceChart.data.labels = labels;
+  histValenceChart.data.datasets[0].data = vH;
+  histValenceChart.update('none');
+
+  if (!histArousalChart) {
+    histArousalChart = new Chart(document.getElementById('histArousal'), {
+      type: 'bar',
+      data: { labels: [], datasets: [{ data: [], backgroundColor: 'rgba(255,45,122,0.6)', borderRadius: 4, hoverBackgroundColor: 'rgba(255,45,122,0.8)' }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: { x: { grid: { display: false }, ticks: { color: '#5a6a8a' } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6a8a' } } }
+      }
+    });
+  }
+  histArousalChart.data.labels = labels;
+  histArousalChart.data.datasets[0].data = aH;
+  histArousalChart.update('none');
+
+  if (!bboxChart) {
+    bboxChart = new Chart(document.getElementById('bboxChart'), {
+      type: 'line',
+      data: { labels: [], datasets: [{ data: [], borderColor: '#7b5cff', backgroundColor: 'rgba(123,92,255,0.15)', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: { x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6a8a', maxTicksLimit: 8 } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6a8a' } } }
+      }
+    });
+  }
+  bboxChart.data.labels = currentRecords.map(r => fmtTime(r.t_ms));
+  bboxChart.data.datasets[0].data = bh;
+  bboxChart.update('none');
+}
+
+function updateOverviewCharts() {
+  const maxD = Math.max(...personsData.map(p => Math.abs(p.deltaV?.delta||0)), ...personsData.map(p => Math.abs(p.deltaA?.delta||0)), 0.1);
+  
+  document.getElementById('deltaBarsV').innerHTML = personsData.map((p, i) => {
+    const d = p.deltaV?.delta || 0, w = Math.min(50, Math.abs(d)/maxD*50);
+    const cls = d > 0.02 ? 'positive' : (d < -0.02 ? 'negative' : 'neutral');
+    return `<div class="delta-bar-item" style="animation: fadeUp 0.3s ${i*0.05}s both;">
+      <div class="delta-bar-label">#${p.person_id}</div>
+      <div class="delta-bar-track"><div class="delta-bar-center"></div><div class="delta-bar-fill ${cls}" style="width:${w}%"></div></div>
+      <div class="delta-bar-value ${cls}">${formatDelta(d)}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('deltaBarsA').innerHTML = personsData.map((p, i) => {
+    const d = p.deltaA?.delta || 0, w = Math.min(50, Math.abs(d)/maxD*50);
+    const cls = d > 0.02 ? 'positive' : (d < -0.02 ? 'negative' : 'neutral');
+    return `<div class="delta-bar-item" style="animation: fadeUp 0.3s ${i*0.05}s both;">
+      <div class="delta-bar-label">#${p.person_id}</div>
+      <div class="delta-bar-track"><div class="delta-bar-center"></div><div class="delta-bar-fill ${cls}" style="width:${w}%"></div></div>
+      <div class="delta-bar-value ${cls}">${formatDelta(d)}</div>
+    </div>`;
+  }).join('');
+
+  if (!compareChart) {
+    compareChart = new Chart(document.getElementById('compareChart'), {
+      type: 'bar',
+      data: { labels: [], datasets: [
+        { label: 'Valence', data: [], backgroundColor: 'rgba(0,229,255,0.7)', borderRadius: 6, hoverBackgroundColor: 'rgba(0,229,255,0.9)' },
+        { label: 'Arousal', data: [], backgroundColor: 'rgba(255,45,122,0.7)', borderRadius: 6, hoverBackgroundColor: 'rgba(255,45,122,0.9)' }
+      ]},
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#a0aec0' } } },
+        scales: { x: { grid: { display: false }, ticks: { color: '#5a6a8a' } }, y: { min: -1, max: 1, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6a8a' } } }
+      }
+    });
+  }
+  compareChart.data.labels = personsData.map(p => `#${p.person_id}`);
+  compareChart.data.datasets[0].data = personsData.map(p => p.avg_valence);
+  compareChart.data.datasets[1].data = personsData.map(p => p.avg_arousal);
+  compareChart.update('none');
+}
+
+// Metrics
+async function loadMetrics() {
+  let fromDate;
+  let toDate = new Date();
+  
+  switch(selectedPeriod) {
+    case 'today': {
+      fromDate = new Date(toDate);
+      fromDate.setHours(0, 0, 0, 0);
+      break;
+    }
+    case '7d': {
+      fromDate = new Date(toDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+      fromDate.setHours(0, 0, 0, 0);
+      break;
+    }
+    case '30d': {
+      fromDate = new Date(toDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+      fromDate.setHours(0, 0, 0, 0);
+      break;
+    }
+    case 'custom': {
+      const fromVal = document.getElementById('dateFrom').value;
+      const toVal = document.getElementById('dateTo').value;
+      if (!fromVal || !toVal) return;
+      fromDate = new Date(fromVal);
+      toDate = new Date(toVal);
+      fromDate.setHours(0, 0, 0, 0);
+      toDate.setHours(23, 59, 59, 999);
+      break;
+    }
+    default:
+      fromDate = new Date(toDate);
+      fromDate.setHours(0,0,0,0);
+  }
+
+  // выбираем реальную гранулярность: ручная настройка или авто
+  let granularity;
+  if (metricsResolution) {
+    granularity = metricsResolution; // 'hour' или 'day'
+  } else {
+    granularity = (toDate - fromDate) <= 24 * 60 * 60 * 1000 ? 'hour' : 'day';
+    // обновляем подсветку кнопок только если пользователь сам не выбирал
+    document.querySelectorAll('.resolution-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.resolution === granularity);
+    });
+  }
+
+  const metricsData = computeMetrics(fromDate, toDate, granularity);
+  
+  // Update stats
+  document.getElementById('metricVisitors').textContent = metricsData.totalVisitors;
+  document.getElementById('metricDeltaV').textContent = formatDelta(metricsData.avgDeltaV);
+  document.getElementById('metricDeltaA').textContent = formatDelta(metricsData.avgDeltaA);
+  
+  // Info string (диапазон + группировка)
+  const infoEl = document.getElementById('metricsInfo');
+  if (infoEl) {
+    const fromStr = fmtDate(fromDate);
+    const toStr = fmtDate(toDate);
+    const rangeStr = fromStr === toStr ? fromStr : `${fromStr} — ${toStr}`;
+    const groupStr = granularity === 'hour' ? 'по часам' : 'по дням';
+    infoEl.textContent = `Период: ${rangeStr} • ${groupStr} • интервалов: ${metricsData.timeline.length || 0}`;
+  }
+  
+  // Update chart
+  updateMetricsChartData(metricsData.timeline, granularity);
+}
+
+function computeMetrics(fromDate, toDate, granularity) {
+  const timeline = {};
+  let totalVisitors = 0;
+  let sumDeltaV = 0, sumDeltaA = 0, countDeltas = 0;
+  
+  const fromMs = fromDate.getTime();
+  const toMs = toDate.getTime();
+  
+  personsData.forEach(p => {
+    const records = allRecordsCache[p.person_id] || [];
+    if (!records.length) return;
+    
+    const firstTime = records[0]?.t_ms;
+    const lastTime = records[records.length - 1]?.t_ms;
+    
+    if (!firstTime || firstTime > toMs || lastTime < fromMs) return;
+    
+    totalVisitors++;
+    
+    if (typeof p.deltaV?.delta === 'number') {
+      sumDeltaV += p.deltaV.delta;
+      countDeltas++;
+    }
+    if (typeof p.deltaA?.delta === 'number') {
+      sumDeltaA += p.deltaA.delta;
+    }
+    
+    const d = new Date(firstTime);
+    const bucketKey = granularity === 'hour'
+      ? d.toISOString().slice(0, 13) + ':00'
+      : d.toISOString().slice(0, 10);
+    
+    if (!timeline[bucketKey]) {
+      timeline[bucketKey] = { visitors: 0, sumDeltaV: 0, sumDeltaA: 0, count: 0 };
+    }
+    timeline[bucketKey].visitors++;
+    if (typeof p.deltaV?.delta === 'number') {
+      timeline[bucketKey].sumDeltaV += p.deltaV.delta;
+      timeline[bucketKey].sumDeltaA += p.deltaA?.delta || 0;
+      timeline[bucketKey].count++;
+    }
+  });
+  
+  const timelineArray = Object.entries(timeline)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([ts, data]) => ({
+      ts,
+      visitors: data.visitors,
+      avgDeltaV: data.count ? data.sumDeltaV / data.count : 0,
+      avgDeltaA: data.count ? data.sumDeltaA / data.count : 0
+    }));
+  
+  return {
+    totalVisitors,
+    avgDeltaV: countDeltas ? sumDeltaV / countDeltas : 0,
+    avgDeltaA: countDeltas ? sumDeltaA / countDeltas : 0,
+    timeline: timelineArray
+  };
+}
+
+function updateMetricsChartData(timeline, granularity) {
+  if (!timeline || !timeline.length) {
+    if (metricsChart) {
+      metricsChart.data.labels = [];
+      metricsChart.data.datasets.forEach(ds => ds.data = []);
+      metricsChart.update('none');
+    }
+    return;
+  }
+
+  if (!metricsChart) {
+    metricsChart = new Chart(document.getElementById('metricsChart'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Visitors', data: [], borderColor: '#00ffa3', backgroundColor: 'rgba(0,255,163,0.1)', borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 8, tension: 0.4, fill: true, yAxisID: 'y1' },
+          { label: 'Avg ΔV', data: [], borderColor: '#00e5ff', backgroundColor: 'rgba(0,229,255,0.1)', borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 8, tension: 0.4, fill: false, yAxisID: 'y2' },
+          { label: 'Avg ΔA', data: [], borderColor: '#ff2d7a', backgroundColor: 'rgba(255,45,122,0.1)', borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 8, tension: 0.4, fill: false, yAxisID: 'y2' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6a8a', font: { family: 'IBM Plex Mono' } } },
+          y1: { position: 'left', grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#00ffa3', font: { family: 'IBM Plex Mono' } }, title: { display: true, text: 'Visitors', color: '#00ffa3' } },
+          y2: { position: 'right', grid: { display: false }, ticks: { color: '#5a6a8a', font: { family: 'IBM Plex Mono' } }, title: { display: true, text: 'Δ Values', color: '#5a6a8a' } }
+        }
+      }
+    });
+  }
+  
+  const labels = timeline.map(t =>
+    granularity === 'hour'
+      ? t.ts.slice(11, 16) // HH:MM
+      : fmtDate(new Date(t.ts))
+  );
+  
+  metricsChart.data.labels = labels;
+  metricsChart.data.datasets[0].data = timeline.map(t => t.visitors);
+  metricsChart.data.datasets[1].data = timeline.map(t => t.avgDeltaV);
+  metricsChart.data.datasets[2].data = timeline.map(t => t.avgDeltaA);
+
+  // динамический масштаб по ΔV/ΔA
+  const deltaValues = [];
+  timeline.forEach(t => {
+    if (typeof t.avgDeltaV === 'number') deltaValues.push(t.avgDeltaV);
+    if (typeof t.avgDeltaA === 'number') deltaValues.push(t.avgDeltaA);
+  });
+
+  if (deltaValues.length) {
+    let min = Math.min(...deltaValues);
+    let max = Math.max(...deltaValues);
+    if (min === max) {
+      const padding = Math.max(Math.abs(min) * 0.4, 0.05);
+      min -= padding;
+      max += padding;
+    } else {
+      const padding = (max - min) * 0.2;
+      min -= padding;
+      max += padding;
+    }
+    min = Math.max(-1, min);
+    max = Math.min(1, max);
+    metricsChart.options.scales.y2.min = min;
+    metricsChart.options.scales.y2.max = max;
+  } else {
+    metricsChart.options.scales.y2.min = -0.5;
+    metricsChart.options.scales.y2.max = 0.5;
+  }
+  
+  updateMetricsChart();
+}
+
+function updateMetricsChart() {
+  if (!metricsChart) return;
+  
+  metricsChart.data.datasets[0].hidden = !selectedMetrics.visitors;
+  metricsChart.data.datasets[1].hidden = !selectedMetrics['delta-v'];
+  metricsChart.data.datasets[2].hidden = !selectedMetrics['delta-a'];
+  
+  metricsChart.update('none');
+}
+
+function renderPersonGrid(persons) {
+  const grid = document.getElementById('personGrid');
+  
+  grid.innerHTML = persons.map((p, i) => `
+    <div class="person-card ${p.person_id === currentPersonId ? 'active' : ''}" 
+         onclick="loadPerson(${p.person_id})"
+         style="animation-delay: ${i * 0.03}s">
+      <div class="person-header">
+        <div class="person-id">#${p.person_id}</div>
+        <div class="person-badge">${p.n_points} точек</div>
+      </div>
+      <div class="person-device">🔧 ${p.device_id}</div>
+      <div class="person-emotions">
+        <div class="emotion-box"><div class="emotion-label">Valence</div><div class="emotion-value valence">${p.avg_valence.toFixed(2)}</div></div>
+        <div class="emotion-box"><div class="emotion-label">Arousal</div><div class="emotion-value arousal">${p.avg_arousal.toFixed(2)}</div></div>
+        <div class="emotion-box"><div class="emotion-label">ΔV</div><div class="emotion-value ${getDeltaClass(p.deltaV?.delta || 0)}">${formatDelta(p.deltaV?.delta || 0)}</div></div>
+        <div class="emotion-box"><div class="emotion-label">ΔA</div><div class="emotion-value ${getDeltaClass(p.deltaA?.delta || 0)}">${formatDelta(p.deltaA?.delta || 0)}</div></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadPersons() {
+  try {
+    personsData = await fetchJSON(`${API}/v1/persons`);
+    const grid = document.getElementById('personGrid');
+    document.getElementById('personCount').textContent = `${personsData.length} записей`;
+
+    if (!personsData.length) {
+      grid.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div>Нет данных</div></div>';
+      document.getElementById('statusText').textContent = 'Нет данных';
+      return;
+    }
+
+    // Parallel loading of all person records
+    const promises = personsData.map(p => 
+      fetchJSON(`${API}/v1/logs?person_id=${p.person_id}&limit=${LIMIT}`)
+        .then(data => {
+          const recs = data.records || [];
+          allRecordsCache[p.person_id] = recs;
+          p.deltaV = calculateDelta(recs.map(r => r.valence));
+          p.deltaA = calculateDelta(recs.map(r => r.arousal));
+        })
+        .catch(() => { p.deltaV = { delta: 0 }; p.deltaA = { delta: 0 }; })
+    );
+    
+    await Promise.all(promises);
+
+    const sortKey = document.getElementById('sortSelect').value;
+    renderPersonGrid(sortPersons(personsData, sortKey));
+
+    document.getElementById('statusText').textContent = `${personsData.length} человек`;
+    if (!currentPersonId && personsData.length) loadPerson(personsData[0].person_id);
+  } catch (err) {
+    console.error(err);
+    document.getElementById('statusText').textContent = 'Ошибка';
+  }
+}
+
+async function loadPerson(personId) {
+  currentPersonId = personId;
+  
+  // Scroll to top smoothly
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  
+  document.getElementById('statsRow').style.display = 'grid';
+  document.getElementById('chartCard').style.display = 'block';
+
+  try {
+    // Use cached data if available
+    currentRecords = allRecordsCache[personId] || [];
+    
+    if (!currentRecords.length) {
+      const data = await fetchJSON(`${API}/v1/logs?person_id=${personId}&limit=${LIMIT}`);
+      currentRecords = data.records || [];
+      allRecordsCache[personId] = currentRecords;
+    }
+    
+    const v = currentRecords.map(r => r.valence), a = currentRecords.map(r => r.arousal);
+    const c = createMainChart();
+    c.data.labels = currentRecords.map(r => fmtTime(r.t_ms));
+    c.data.datasets[0].data = v;
+    c.data.datasets[1].data = a;
+    c.update('none');
+
+    const avgV = v.length ? v.reduce((x,y)=>x+y,0)/v.length : 0;
+    const avgA = a.length ? a.reduce((x,y)=>x+y,0)/a.length : 0;
+    const dV = calculateDelta(v), dA = calculateDelta(a);
+
+    document.getElementById('personId').textContent = `#${personId}`;
+    document.getElementById('avgV').textContent = avgV.toFixed(3);
+    document.getElementById('avgA').textContent = avgA.toFixed(3);
+    document.getElementById('points').textContent = currentRecords.length;
+
+    const dVEl = document.getElementById('deltaV'), dAEl = document.getElementById('deltaA');
+    dVEl.textContent = formatDelta(dV.delta);
+    dVEl.className = 'stat-value ' + getDeltaClass(dV.delta);
+    dAEl.textContent = formatDelta(dA.delta);
+    dAEl.className = 'stat-value ' + getDeltaClass(dA.delta);
+
+    document.querySelectorAll('.person-card').forEach(el => {
+      const id = parseInt(el.querySelector('.person-id').textContent.replace('#',''));
+      el.classList.toggle('active', id === personId);
+    });
+
+    if (document.getElementById('tab-analysis').classList.contains('active')) updateAnalysisCharts();
+  } catch (err) { console.error(err); }
+}
+
+loadPersons();
+setInterval(loadPersons, 60000);
+</script>
+</body>
+</html>
